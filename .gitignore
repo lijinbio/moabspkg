@@ -15,8 +15,5 @@ stamp-h1
 *.o
 *.a
 .deps
-bin
-samtools
-bsmap
 *.dSYM
-numCI
+bin
