@@ -14,30 +14,22 @@ AC_ARG_WITH(boost, AS_HELP_STRING([--with-boost], [home directory for boost]), B
 AC_ARG_WITH(zlib, AS_HELP_STRING([--with-zlib], [home directory for zlib]), ZLIB_HOME=$withval, ZLIB_HOME=)
 
 # Assign CXXFLAGS
-AS_IF([test "x$BOOST_HOME" != "x"], [AC_SUBST([CXXFLAGS], ["-I$BOOST_HOME $CXXFLAGS"])], [])
-
-# Check whether static is enabled
-AC_ARG_ENABLE([static], [AS_HELP_STRING([--enable-static], [enable static linking])])
-
-# If statis is enabled, directly assign .a files to LIBS
-AS_IF([test "x$enable_static" = xyes], [AC_SUBST([LIBS], ["-lz $LIBS"])])
+AS_IF([test "x$BOOST_HOME" != "x"], [AC_SUBST([CXXFLAGS], ["-I$BOOST_HOME $CXXFLAGS"]), AC_SUBST([LDFLAGS], ["-L$BOOST_HOME/lib $LDFLAGS"])], [])
 
 # Checks for header files.
 AC_CHECK_HEADERS([stdint.h])
 
-# Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
 AC_C_INLINE
 AC_TYPE_INT32_T
 AC_TYPE_INT64_T
 AC_TYPE_UINT32_T
 
-# Checks for library functions.
-
 AC_CONFIG_FILES([
 	Makefile
 	lib/Makefile
 	src/Makefile
 	src/bsmap/Makefile
+	src/ExactNumCI/Makefile
 	])
 AC_OUTPUT

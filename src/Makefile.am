@@ -1,1 +1,1 @@
-SUBDIRS = bsmap
+SUBDIRS = bsmap ExactNumCI
