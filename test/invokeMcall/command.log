@@ -1,0 +1,1 @@
+nohup ~/moabs/moabs-v1.3.3.src.x86_64_Linux.data/bin/moabs --cf invokeMcall.cfg > moabs.invokeMcall.cfg.log &

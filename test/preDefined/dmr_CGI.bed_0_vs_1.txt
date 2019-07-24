@@ -1,0 +1,1 @@
+#chrom	start	end	meanRatio_0	totalC_0	cSites_0	meanRatio_1	totalC_1	cSites_1	meanOfNominalDif1-0	p_fet_1_v_0	class_1_v_0	 sim, gm 	sim	gm	 relativeSim, gm 	relativeSim	relativeGm	meanOfCredibleDif	meanOfAbsCredibleDif	minNominalDif	nHypoDmc	nHyperDmc	minCredibleDif	nHypoDmc	nHyperDmc
