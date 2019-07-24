@@ -1,9 +1,7 @@
 bin_PROGRAMS = mcomp
 
-samtools_INCLUDE = $(top_srcdir)/lib/samtools
-samtools_LIB = $(top_srcdir)/lib/samtools
-
-mcomp_CPPFLAGS = -O3 -pipe -Wall -w -Ilib -isystem -Ilib/eigen_3.2.4 -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -Wno-unused-function
+mcomp_CPPFLAGS = -Wall -w -Ilib -Ilib/eigen_3.2.4 -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -Wno-unused-function -Wno-invalid-partial-specialization
+CXXFLAGS = -O3 -pipe
 mcomp_LDADD = -lboost_program_options -lboost_system -lboost_filesystem -lboost_thread -lpthread
 
 mcomp_SOURCES = \
