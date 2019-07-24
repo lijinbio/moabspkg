@@ -32,5 +32,6 @@ AC_CONFIG_FILES([
 	src/bsmap/Makefile
 	src/ExactNumCI/Makefile
 	src/mcall/Makefile
+	src/mcomp/Makefile
 	])
 AC_OUTPUT
