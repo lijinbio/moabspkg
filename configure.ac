@@ -1,3 +1,6 @@
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
+
 AC_PREREQ([2.69])
 AC_INIT([moabs], [1.3.4], [dsun@tamu.edu])
 AM_INIT_AUTOMAKE()
@@ -24,6 +27,23 @@ AC_C_INLINE
 AC_TYPE_INT32_T
 AC_TYPE_INT64_T
 AC_TYPE_UINT32_T
+
+_os=`uname`
+
+case "$_os" in
+  "Linux")
+	  os_linux=yes
+    ;;
+  "Darwin")
+	  os_darwin=yes
+    ;;
+  *)
+    AC_MSG_ERROR([$_os operating system is not suitable to build dmake!])
+    ;;
+esac
+
+AM_CONDITIONAL([OS_LINUX], [test x"$os_linux" = x"yes"])
+AM_CONDITIONAL([OS_DARWIN], [test x"$os_darwin" = x"yes"])
 
 AC_CONFIG_FILES([
 	Makefile

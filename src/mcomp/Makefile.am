@@ -2,7 +2,14 @@ bin_PROGRAMS = mcomp
 
 mcomp_CPPFLAGS = -Wall -w -Ilib -Ilib/eigen_3.2.4 -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -Wno-unused-function -Wno-invalid-partial-specialization
 CXXFLAGS = -O3 -pipe
+
+if OS_LINUX
 mcomp_LDADD = -lboost_program_options -lboost_system -lboost_filesystem -lboost_thread -lrt -lpthread
+endif
+
+if OS_DARWIN
+mcomp_LDADD = -lboost_program_options -lboost_system -lboost_filesystem -lboost_thread -lpthread
+endif
 
 mcomp_SOURCES = \
 	Boolean.h \

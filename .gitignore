@@ -16,3 +16,5 @@ stamp-h1
 *.a
 .deps
 *.dSYM
+config.h.in~
+*.tmp

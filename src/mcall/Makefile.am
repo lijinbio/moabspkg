@@ -6,6 +6,14 @@ samtools_LIB = $(top_srcdir)/lib/samtools
 mcall_CPPFLAGS = -Wall -w -I$(samtools_INCLUDE)
 CXXFLAGS = -g -O3
 mcall_LDFLAGS = -L$(samtools_LIB)
-mcall_LDADD = -lboost_program_options -lboost_system -lboost_filesystem -lboost_thread -lboost_date_time -lbam -lrt -lz -lpthread
+
+
+if OS_LINUX
+mcall_LDADD = -lboost_program_options -lboost_system -lboost_filesystem -lboost_thread -lboost_date_time -lbam -lz -lrt -lpthread
+endif
+
+if OS_DARWIN
+mcall_LDADD = -lboost_program_options -lboost_system -lboost_filesystem -lboost_thread -lboost_date_time -lbam -lz -lpthread
+endif
 
 mcall_SOURCES =  mcall.cpp
