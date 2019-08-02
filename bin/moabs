@@ -780,7 +780,7 @@ sub startMCALL_qsub ##(\$bam)
 sub startMCOMP ##()
 {
     my ($a, $b, $o) = @_;
-    if( -e $o ){
+    if((-e $o) && (exists $opt{'MCOMP.doComp'}) && ($opt{'MCOMP.doComp'} eq "1")){
         print STDOUT "File $o exists... skipping the MCOMP program...\n";
         return 0;
     }
