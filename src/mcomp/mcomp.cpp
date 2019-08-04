@@ -1560,31 +1560,37 @@ void doComp(map <int, map <string, map<int, cMeth> > > & lane, string fileName, 
 		//cout << chr << endl;
 	}
 	//if(option.threads == 0)//dsun
-	if(option.threads == 1)
-	{
-		//loop through all the genomic locations by chrom and then start.
-		for (set<string>::iterator pchr=chroms.begin(); pchr!=chroms.end(); pchr++)
-		{
-			string chr = *pchr;
-			//cout << "start chr" << endl;
+	/*
+	 * @ 20190804 by Jin Li
+	 * threads=1 will generate different comparison table with threads>1
+	 * only FET p-value is calculated when threads=1, which will cause segmentation fault in downstream DRM calling
+	 * Because both psim and pfet will be read in DMC and DMR calling
+	 */
+	// if(option.threads == 1)
+	// {
+	// 	//loop through all the genomic locations by chrom and then start.
+	// 	for (set<string>::iterator pchr=chroms.begin(); pchr!=chroms.end(); pchr++)
+	// 	{
+	// 		string chr = *pchr;
+	// 		//cout << "start chr" << endl;
 
-			//get all locations for current chrom
-			set <int> starts;
-			for(unsigned int i = 0; i < lane.size(); i++ ){
-				for(map<int, cMeth>::iterator it = lane[i][chr].begin(); it != lane[i][chr].end(); ++it) {
-				  starts.insert(it->first);
-				}
-			}
+	// 		//get all locations for current chrom
+	// 		set <int> starts;
+	// 		for(unsigned int i = 0; i < lane.size(); i++ ){
+	// 			for(map<int, cMeth>::iterator it = lane[i][chr].begin(); it != lane[i][chr].end(); ++it) {
+	// 			  starts.insert(it->first);
+	// 			}
+	// 		}
 
-			//do a single comparison for chr->start->cMeth
-			for(set<int>::iterator pstart = starts.begin(); pstart != starts.end(); pstart++ ){
-				int start = *pstart;
-				//cout << "this :" << chr << "..." << start << endl;
-				allCompFile << compOneLocSingleThread(lane, chr, start) << endl;
-			}
-		}
-	}
-	else 				// do a comparison of a batch of genomic sites
+	// 		//do a single comparison for chr->start->cMeth
+	// 		for(set<int>::iterator pstart = starts.begin(); pstart != starts.end(); pstart++ ){
+	// 			int start = *pstart;
+	// 			//cout << "this :" << chr << "..." << start << endl;
+	// 			allCompFile << compOneLocSingleThread(lane, chr, start) << endl;
+	// 		}
+	// 	}
+	// }
+	// else 				// do a comparison of a batch of genomic sites
 	{
 		//vector < vector<string> > outToPrint;
 		//vector<string> routToPrint;
