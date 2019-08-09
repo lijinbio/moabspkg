@@ -55,16 +55,17 @@ namespace po = boost::program_options;
 using namespace std;
 
 
-std::string do_readlink(std::string const& path) {
-    char buff[1024];
-    ssize_t len = ::readlink(path.c_str(), buff, sizeof(buff)-1);
-    if (len != -1) {
-      buff[len] = '\0';
-      return std::string(buff);
-    } else {
-     /* handle error condition */
-    }
-}
+// Moved to `types.h` and `types.cpp`
+// std::string do_readlink(std::string const& path) {
+//     char buff[1024];
+//     ssize_t len = ::readlink(path.c_str(), buff, sizeof(buff)-1);
+//     if (len != -1) {
+//       buff[len] = '\0';
+//       return std::string(buff);
+//     } else {
+//      /* handle error condition */
+//     }
+// }
 
 
 //RInside R;
@@ -176,7 +177,7 @@ int parse_options(int ac, char * av[]){
 	("threads,p", 							po::value<int>()->default_value(6), "Specify number of threads; suggest number 6-12; default 6;")
 	("lmFit", 								po::value<int>()->default_value(1), "Specify if lenear model fitting is performed; default true; Note that 'na' is generated if slope is 0;")
 	("mergeNotIntersect", 					po::value<int>()->default_value(1), "Specify if genomic locations are merged or intersected among samples; 1 for merge(default) and 0 for intersect;")
-	("withVariance", 						po::value<int>()->default_value(0), "Specify if there's individual variance among samples; default 0 for most animal models and 1 for most patient studies;")
+	("withVariance", 						po::value<int>()->default_value(0), "Specify if there's individual biological variance among the same condition; default 0; Should be 0 for most animal models 1 for most patient studies; WithVariance=1 is not effective if only 1 or 2 replicates.")
 	("doMergeRatioFiles", 					po::value<int>()->default_value(0), "Internal parameter. Is true when -m parameter is ',' separated and program will merge ratio Files that are separated by ',' and the output files are named according to option -x;")
 	("doStrandSpecifiMeth", 				po::value<int>()->default_value(0), "whether strand specific methylation analysis will be performed;")
 	("doComp", 								po::value<int>()->default_value(1), "doComp;")
@@ -553,7 +554,7 @@ void readLaneToHash( string file, Opts & option, map <string, map<int, cMeth> > 
 	int colIdForStart = 1;
 	int colIdForStrand = 6;
 	int colIdForNext = 7;
-	cout << "if no header #chom in file, default index order is #chrom, start, end, ratio, totalC, methC, strand, nextN" << endl;
+	cout << "if no header #chom in file, default index order is #chrom, start, end, ratio, totalC, methC, strand, next" << endl;
 	string chrom;
 	int start;
 	int totalC;
@@ -3635,6 +3636,8 @@ int load_lut(int num_threads, string exep)
 
 	} else {
 		cout << "Building " << exep << "/lut_pdiffInRegion.dat" << endl;
+		cout << "You should not see this message unless you are trying to build the database" << endl;
+		cout << "Check if lut_pdiffInRegion.dat is at the same location with mcomp" << endl;
 
 		int tableMax = 30;
 		//build
@@ -3719,64 +3722,65 @@ int load_lut(int num_threads, string exep)
 		fclose(fpLut);
 	}
 
+// Do not load `lut_fet` for now, since it is not used.
 
-	//build table for fisher exact test
-	if( boost::filesystem::exists( exep + "/lut_fet.dat" ) ){
-		cout << "Reading " << exep << "/lut_fet.dat" << endl;
-		//read
-		int tableMax;
-		FILE *FpLut=fopen((exep + "/lut_fet.dat").c_str(), "rb");
-
-		double value;
-		fread( &value, 1, sizeof(value), FpLut);
-		tableMax = (int) value;
-
-		for(int n1 = 1; n1 <= tableMax; n1 ++){
-			for(int k1 = 0; k1 <= n1; k1 ++){
-				for(int n2 = 1; n2 <= tableMax; n2 ++){
-					for(int k2 = 0; k2 <= n2; k2 ++){
-						MultiKey combi(n1,k1,n2,k2);
-						fread( &value, 1, sizeof(value), FpLut);
-						lut_fet[combi] = value;
-						//cout << std::setprecision(20);
-						//cout << n1 << "\t" << k1 << "\t" << n2 << "\t" << k2 << "\t" << lut_fet[combi] << endl;
-					}
-				}
-			}
-		}
-		fclose(FpLut);
-
-	} else {
-		cout << "Building " << exep << "/lut_fet.dat" << endl;
-		//build_lut_fet_singleThread(50);//takes 102 seconds on a 3.5Ghz CPU
-		//build_lut_fet_singleThread(60);//takes 203 seconds on a 3.5Ghz CPU
-		//build_lut_fet(100, 24); //using the CC version 'fisher.c', it takes 23 seconds on a 3.5Ghz CPU
-		int tableMax = 30;
-		//build
-		build_lut_fet(tableMax, num_threads); //The fexat.c is not thread safe.
-		//build_lut_fet_singleThread(tableMax);
-		//cout << "finish here" << endl;
-		//write
-		FILE *fpLut=fopen((exep + "/lut_fet.dat").c_str(), "wb");
-		double value=(double)tableMax;
-		fwrite(&value, 1, sizeof(value), fpLut); // table starts with tableMax;
-		for(int n1 = 1; n1 <= tableMax; n1 ++){
-			for(int k1 = 0; k1 <= n1; k1 ++){
-				for(int n2 = 1; n2 <= tableMax; n2 ++){
-					for(int k2 = 0; k2 <= n2; k2 ++){
-						//int varray[] = {k1, n1-k1, k2, n2-k2};
-						//fet_1k( value, varray, 2, 2 );
-						MultiKey combi(n1,k1,n2,k2);
-						value = lut_fet[combi];
-						fwrite(&value, 1, sizeof(value), fpLut);
-						//cout << std::setprecision(20);
-						//cout << n1 << "\t" << k1 << "\t" << n2 << "\t" << k2 << "\t" << value << endl;
-					}
-				}
-			}
-		}
-		fclose(fpLut);
-	}
+// 	//build table for fisher exact test
+// 	if( boost::filesystem::exists( exep + "/lut_fet.dat" ) ){
+// 		cout << "Reading " << exep << "/lut_fet.dat" << endl;
+// 		//read
+// 		int tableMax;
+// 		FILE *FpLut=fopen((exep + "/lut_fet.dat").c_str(), "rb");
+// 
+// 		double value;
+// 		fread( &value, 1, sizeof(value), FpLut);
+// 		tableMax = (int) value;
+// 
+// 		for(int n1 = 1; n1 <= tableMax; n1 ++){
+// 			for(int k1 = 0; k1 <= n1; k1 ++){
+// 				for(int n2 = 1; n2 <= tableMax; n2 ++){
+// 					for(int k2 = 0; k2 <= n2; k2 ++){
+// 						MultiKey combi(n1,k1,n2,k2);
+// 						fread( &value, 1, sizeof(value), FpLut);
+// 						lut_fet[combi] = value;
+// 						//cout << std::setprecision(20);
+// 						//cout << n1 << "\t" << k1 << "\t" << n2 << "\t" << k2 << "\t" << lut_fet[combi] << endl;
+// 					}
+// 				}
+// 			}
+// 		}
+// 		fclose(FpLut);
+// 
+// 	} else {
+// 		cout << "Building " << exep << "/lut_fet.dat" << endl;
+// 		//build_lut_fet_singleThread(50);//takes 102 seconds on a 3.5Ghz CPU
+// 		//build_lut_fet_singleThread(60);//takes 203 seconds on a 3.5Ghz CPU
+// 		//build_lut_fet(100, 24); //using the CC version 'fisher.c', it takes 23 seconds on a 3.5Ghz CPU
+// 		int tableMax = 30;
+// 		//build
+// 		build_lut_fet(tableMax, num_threads); //The fexat.c is not thread safe.
+// 		//build_lut_fet_singleThread(tableMax);
+// 		//cout << "finish here" << endl;
+// 		//write
+// 		FILE *fpLut=fopen((exep + "/lut_fet.dat").c_str(), "wb");
+// 		double value=(double)tableMax;
+// 		fwrite(&value, 1, sizeof(value), fpLut); // table starts with tableMax;
+// 		for(int n1 = 1; n1 <= tableMax; n1 ++){
+// 			for(int k1 = 0; k1 <= n1; k1 ++){
+// 				for(int n2 = 1; n2 <= tableMax; n2 ++){
+// 					for(int k2 = 0; k2 <= n2; k2 ++){
+// 						//int varray[] = {k1, n1-k1, k2, n2-k2};
+// 						//fet_1k( value, varray, 2, 2 );
+// 						MultiKey combi(n1,k1,n2,k2);
+// 						value = lut_fet[combi];
+// 						fwrite(&value, 1, sizeof(value), fpLut);
+// 						//cout << std::setprecision(20);
+// 						//cout << n1 << "\t" << k1 << "\t" << n2 << "\t" << k2 << "\t" << value << endl;
+// 					}
+// 				}
+// 			}
+// 		}
+// 		fclose(fpLut);
+// 	}
 
 
 
@@ -3865,14 +3869,14 @@ try{
 
 		cout << "Starting to do comparisons." << endl;
 
-
-		//string exep(  (char *)getauxval(AT_EXECFN) );
-		string exep = do_readlink("/proc/self/exe");
-		vector<string> splits;
-		boost::split(splits, exep, boost::is_any_of("/"));
-		splits.pop_back();
-		exep = boost::algorithm::join(splits, "/");
-		std::cout << exep << std::endl;
+// Refactored to `get_exepath()` in `types.h` and `types.cpp`
+// 		//string exep(  (char *)getauxval(AT_EXECFN) );
+// 		string exep = do_readlink("/proc/self/exe");
+// 		vector<string> splits;
+// 		boost::split(splits, exep, boost::is_any_of("/"));
+// 		splits.pop_back();
+// 		exep = boost::algorithm::join(splits, "/");
+// 		std::cout << exep << std::endl;
 //		boost::filesystem::path exepath(argv[0]);
 //		string exep = exepath.parent_path().string();
 //		if(exep == ""){ //that means argv[0] is just a command without path infomation
@@ -3895,6 +3899,7 @@ try{
 	    //this doesnot improve the situation like mcomp -r a.bed ...
 	    //if your current working dir is /pathA and mcomp is /pathB/mcomp, it returns "/pathA/mcomp" then "/pathA"
 
+		string exep = get_exepath();
 
 		load_lut(GO.threads, exep);
 		cout << "Finished loading lookup tables" << endl;

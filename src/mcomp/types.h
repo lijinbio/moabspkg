@@ -22,7 +22,7 @@ class MultiKey {
     int  n2;
     int  k2;
 
-    MultiKey(long N1, int K1, long N2, long K2)
+    MultiKey(int N1, int K1, int N2, int K2)
       : n1(N1), k1(K1), n2(N2), k2(K2) {}
 
     bool operator<(const MultiKey &right) const
@@ -51,7 +51,7 @@ class BiKey {
     int  n1;
     int  k1;
 
-    BiKey(long N1, int K1)
+    BiKey(int N1, int K1)
       : n1(N1), k1(K1) {}
 
     bool operator<(const BiKey &right) const
@@ -119,3 +119,5 @@ public:
 
 std::string itos(int i);
 int string_to_int( std::string s);
+std::string get_exepath();
+std::string do_readlink(std::string const& path);
