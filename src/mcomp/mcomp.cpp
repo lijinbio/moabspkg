@@ -1738,7 +1738,133 @@ void strandSpecificMethForLane( string inputFile )
 }
 
 
+void mergeRatioFilesWorker(	map<int, map <string, map<int, cMeth> > >  & lanesPlus, map<int, map <string, map<int, cMeth> > >  & lanesMinus, string chr, set <int> & starts, int pstart, int batchSize, vector<string> & out, Opts & option)
+{
 
+		set <int>::iterator it = starts.begin();
+		for(int j = 0; j <  pstart; j++) it++; //now it points to starts.begin() + pstart// do not understand why "it=starts.begin() + pstart" does not compile.
+
+		for(int k = 0; k < batchSize; k++){
+			stringstream mergedLaneFile;
+			int start = *it;
+			
+		//Todo:It's redundant to do summations for both options. Please detach into two "for" statements.
+		//for(set<int>::iterator pstart = starts.begin(); pstart != starts.end(); pstart++ ){
+		//	int start = *pstart;
+//			int tc;
+//			int mc;
+			char next = 'X';
+
+			//data structure for methC and totalC count values
+			//xx	total-1	plus-2	minus-3
+			//r1	x		x		x
+			//r2	x		x		x
+			//r3	x		x		x
+			map<int, map<char, int> > mcount; //laneId, strand ->mcount
+			map<int, map<char, int> > tcount; //laneId, strand ->tcount
+			for(int i = 0; i < lanesPlus.size(); i++){
+				mcount[i]['B'] = 0;
+				mcount[i]['+'] = 0;
+				mcount[i]['-'] = 0;
+				tcount[i]['B'] = 0;
+				tcount[i]['+'] = 0;
+				tcount[i]['-'] = 0;
+			}
+
+			int tcp = 0;
+			int mcp = 0;
+
+			for(unsigned int i = 0; i < lanesPlus.size(); i++ ){
+				if(lanesPlus[i].count(chr) != 0 && lanesPlus[i][chr].count(start) != 0 && lanesPlus[i][chr][start].totalC > 0 )
+				{
+					tcp += lanesPlus[i][chr][start].totalC;
+					mcp += lanesPlus[i][chr][start].methC;
+					tcount[i]['+'] = lanesPlus[i][chr][start].totalC;
+					mcount[i]['+'] = lanesPlus[i][chr][start].methC;
+					next = lanesPlus[i][chr][start].nextN;
+				}
+			}
+
+			int tcm = 0;
+			int mcm = 0;
+
+			for(unsigned int i = 0; i < lanesMinus.size(); i++ ){
+				if(lanesPlus[i].count(chr) != 0 && lanesMinus[i][chr].count(start) != 0 && lanesMinus[i][chr][start].totalC > 0 )
+				{
+					tcm += lanesMinus[i][chr][start].totalC;
+					mcm += lanesMinus[i][chr][start].methC;
+					tcount[i]['-'] = lanesMinus[i][chr][start].totalC;
+					mcount[i]['-'] = lanesMinus[i][chr][start].methC;
+					next = lanesMinus[i][chr][start].nextN;
+				}
+			}
+			
+			int end = (next == 'G') ? (start + 2) : (start + 1);
+			char strand = 'B';
+			if(tcp == 0){ strand = '-'; }
+			if(tcm == 0){ strand = '+'; }
+
+
+			vector <int> tci;
+			vector <int> mci;
+
+			//wrong. because tci and mci may have different sizes
+//			for(unsigned int i = 0; i < tcpi.size(); i++ ){
+//				tci.push_back(tcpi[i]+tcmi[i]);
+//				mci.push_back(mcpi[i]+mcmi[i]);
+//			}
+
+			//assign value to total column
+			int tc = 0;
+			for(int i = 0; i < lanesPlus.size(); i++){
+				mcount[i]['B'] = mcount[i]['+'] + mcount[i]['-'];
+				tcount[i]['B'] = tcount[i]['+'] + tcount[i]['-'];
+				if(tcount[i]['B']>0){
+					mci.push_back(mcount[i]['B']);
+					tci.push_back(tcount[i]['B']);
+					tc += tcount[i]['B'];
+				}
+			}
+//			cout << "nRep = " << tci.size() << endl;
+//
+//			std::cout	 	<< setprecision(3) << chr << "\t" << start << "\t" << end << "\t" << double(mcp+mcm)/(tcp+tcm)
+//							<< "\t" << tcp+tcm << "\t" << mcp+mcm << "\t" << strand << "\t" << next
+//							<< "\t+\t" << tcp << "\t" << mcp << "\t-\t" << tcm << "\t" << mcm << endl;
+			//for debug purpose
+			//std::cerr << chr << "\t" << start << "\t" << end << endl;
+			//int option_wi_variance = 1;
+			if(option.withVariance && tc >= option.minDepthForComp){
+
+				//std::cout << "Fitting with BetaBinomial Model" << std::endl;
+
+				//cout << "Start Fitting" << endl;
+				BiKey fits(-1, -1);
+
+				if(tci.size() >1 ){
+					BetaBinomialFit(tci, mci, fits); //fits = <int> n1, <int> k1
+				} else {
+					fits.n1 = tci[0];
+					fits.k1 = mci[0];
+				}
+
+
+				mergedLaneFile 	<< setprecision(3) << chr << "\t" << start << "\t" << end << "\t" << double(fits.k1)/(fits.n1)
+								<< "\t" << fits.n1 << "\t" << fits.k1 << "\t" << strand << "\t" << next
+								<< "\t+\t" << tcp << "\t" << mcp << "\t-\t" << tcm << "\t" << mcm;
+			} else if(tc >= option.minDepthForComp) {
+				mergedLaneFile 	<< setprecision(3) << chr << "\t" << start << "\t" << end << "\t" << double(mcp+mcm)/(tcp+tcm)
+								<< "\t" << tcp+tcm << "\t" << mcp+mcm << "\t" << strand << "\t" << next
+								<< "\t+\t" << tcp << "\t" << mcp << "\t-\t" << tcm << "\t" << mcm;
+			} else {
+				//less than minDepthForComp
+			}
+			
+			string moreThanDepthStr = mergedLaneFile.str();
+			if(!   moreThanDepthStr.empty() ) out.push_back(moreThanDepthStr);
+			it++;
+		}
+
+}
 
 void mergeRatioFiles(vector<string> & filesToMerge, string outFileName, Opts & option)
 {
@@ -1797,134 +1923,69 @@ void mergeRatioFiles(vector<string> & filesToMerge, string outFileName, Opts & o
 			}
 		}
 
-		//It's redundant to do summations for both options. Please detach into two "for" statements.
-		for(set<int>::iterator pstart = starts.begin(); pstart != starts.end(); pstart++ ){
-			int start = *pstart;
-//			int tc;
-//			int mc;
-			char next = 'X';
+		///////////////////////////////////////////
+		////////////////////////copied from docomp function. So there are marks for nonR calculation and similar stuff 
+		//mergeRatioFilesWorker();
+		bool endOfChr = false;
+		int pstart = 0;
+		int batchSize = BATCHMAX;
+		boost::thread_group mergeio;
+		//this way of threading makes sure the output is still sorted
+		while( ! endOfChr )
+		{
+			boost::thread_group g;
+			vector < vector<string> > out;
+			out.resize(option.threads);
+			int thisStart = pstart;
 
-
-			int tcp = 0;
-			int mcp = 0;
-//			vector <int> tcpi;
-//			vector <int> mcpi;
-			
-			//data structure for methC and totalC count values
-			//xx	total-1	plus-2	minus-3
-			//r1	x		x		x
-			//r2	x		x		x
-			//r3	x		x		x
-			map<int, map<char, int> > mcount; //laneId, strand ->mcount
-			map<int, map<char, int> > tcount; //laneId, strand ->tcount
-			for(int i = 0; i < lanesPlus.size(); i++){
-				mcount[i]['B'] = 0;
-				mcount[i]['+'] = 0;
-				mcount[i]['-'] = 0;
-				tcount[i]['B'] = 0;
-				tcount[i]['+'] = 0;
-				tcount[i]['-'] = 0;
-			}
-
-			for(unsigned int i = 0; i < lanesPlus.size(); i++ ){
-				if(lanesPlus[i].count(chr) != 0 && lanesPlus[i][chr].count(start) != 0 && lanesPlus[i][chr][start].totalC > 0 )
+			//start nonR calculation on threads
+			//cout << "starting subthreads" << endl;
+			int i = 0;
+			for( ; i < option.threads;  )
+			{
+				if(starts.size() - pstart < BATCHMAX)
 				{
-					tcp += lanesPlus[i][chr][start].totalC;
-					mcp += lanesPlus[i][chr][start].methC;
-//					tcpi.push_back( lanesPlus[i][chr][start].totalC);
-//					mcpi.push_back( lanesPlus[i][chr][start].methC);
-					tcount[i]['+'] = lanesPlus[i][chr][start].totalC;
-					mcount[i]['+'] = lanesPlus[i][chr][start].methC;
-					next = lanesPlus[i][chr][start].nextN;
-					//cout << "Plus i=" << i << " tcpi=" << lanesPlus[i][chr][start].totalC << endl;
-				}
-			}
-			//mergedLane[0][chr][start] = cMeth(tcp, mcp, '+', next);
-
-			int tcm = 0;
-			int mcm = 0;
-			vector <int> tcmi;
-			vector <int> mcmi;
-
-			for(unsigned int i = 0; i < lanesMinus.size(); i++ ){
-				if(lanesPlus[i].count(chr) != 0 && lanesMinus[i][chr].count(start) != 0 && lanesMinus[i][chr][start].totalC > 0 )
+					//cout << i << endl;
+					batchSize = starts.size() - pstart;
+					boost::thread *tp = new boost::thread( mergeRatioFilesWorker, boost::ref(lanesPlus), boost::ref(lanesMinus),chr, boost::ref(starts), pstart, batchSize, boost::ref(out[i]), option );
+					g.add_thread(tp);
+					//compBatchLoc(lane, chr, starts, pstart, batchSize, outStr[i]);
+					pstart = pstart + batchSize;
+					i++;
+					//cout << i << endl;
+					//cout << g.size() << endl;
+					endOfChr = true;
+					break;//no more location in current chrom. breaks out of inner most for loop
+				} else
 				{
-					tcm += lanesMinus[i][chr][start].totalC;
-					mcm += lanesMinus[i][chr][start].methC;
-//					tcmi.push_back( lanesMinus[i][chr][start].totalC);
-//					mcmi.push_back( lanesMinus[i][chr][start].methC);
-					tcount[i]['-'] = lanesMinus[i][chr][start].totalC;
-					mcount[i]['-'] = lanesMinus[i][chr][start].methC;
-					next = lanesMinus[i][chr][start].nextN;
-					//cout << "Minus i=" << i << " tcmi=" << lanesMinus[i][chr][start].totalC << endl;
+					//cout << i << endl;
+					boost::thread *tp = new boost::thread( mergeRatioFilesWorker, boost::ref(lanesPlus), boost::ref(lanesMinus),chr, boost::ref(starts), pstart, batchSize, boost::ref(out[i]), option );
+					g.add_thread(tp);
+					//compBatchLoc(lane, chr, starts, pstart, batchSize, outStr[i]);
+					pstart = pstart + batchSize;
+					i++;
+					//cout << i << endl;
+					//cout << g.size() << endl;
 				}
 			}
-			//mergedLane[1][chr][start] = cMeth(tcm, mcm, '-', next);
-			
-			int end = (next == 'G') ? (start + 2) : (start + 1);
-			char strand = 'B';
-			if(tcp == 0){ strand = '-'; }
-			if(tcm == 0){ strand = '+'; }
+
+			//start R calculation on main thread while nonR calculation is on backgroup thread
+			vector<string> rout;
+
+			g.join_all();
+			//cout << "sub trheads joined......waiting to join output thread" << endl;
 
 
-			vector <int> tci;
-			vector <int> mci;
+			//put both nonR and R calculation to file in a backgroud thread
+			mergeio.join_all();
+			//cout << "joined output thread" << endl;
 
-			//wrong. because tci and mci may have different sizes
-//			for(unsigned int i = 0; i < tcpi.size(); i++ ){
-//				tci.push_back(tcpi[i]+tcmi[i]);
-//				mci.push_back(mcpi[i]+mcmi[i]);
-//			}
-
-			//assign value to total column
-//			int nRep = 0;
-			int tc = 0;
-//			int mc = 0;
-			for(int i = 0; i < lanesPlus.size(); i++){
-				mcount[i]['B'] = mcount[i]['+'] + mcount[i]['-'];
-				tcount[i]['B'] = tcount[i]['+'] + tcount[i]['-'];
-				if(tcount[i]['B']>0){
-//					nRep ++;
-					mci.push_back(mcount[i]['B']);
-					tci.push_back(tcount[i]['B']);
-					tc += tcount[i]['B'];
-				}
-			}
-//			cout << "nRep = " << tci.size() << endl;
-//
-//			std::cout	 	<< setprecision(3) << chr << "\t" << start << "\t" << end << "\t" << double(mcp+mcm)/(tcp+tcm)
-//							<< "\t" << tcp+tcm << "\t" << mcp+mcm << "\t" << strand << "\t" << next
-//							<< "\t+\t" << tcp << "\t" << mcp << "\t-\t" << tcm << "\t" << mcm << endl;
-			//for debug purpose
-			//std::cerr << chr << "\t" << start << "\t" << end << endl;
-			//int option_wi_variance = 1;
-			if(option.withVariance && tc >= option.minDepthForComp){
-
-				//std::cout << "Fitting with BetaBinomial Model" << std::endl;
-
-				//cout << "Start Fitting" << endl;
-				BiKey fits(-1, -1);
-
-				if(tci.size() >1 ){
-					BetaBinomialFit(tci, mci, fits); //fits = <int> n1, <int> k1
-				} else {
-					fits.n1 = tci[0];
-					fits.k1 = mci[0];
-				}
-
-
-				mergedLaneFile 	<< setprecision(3) << chr << "\t" << start << "\t" << end << "\t" << double(fits.k1)/(fits.n1)
-								<< "\t" << fits.n1 << "\t" << fits.k1 << "\t" << strand << "\t" << next
-								<< "\t+\t" << tcp << "\t" << mcp << "\t-\t" << tcm << "\t" << mcm << endl;
-			} else if(tc >= option.minDepthForComp) {
-				mergedLaneFile 	<< setprecision(3) << chr << "\t" << start << "\t" << end << "\t" << double(mcp+mcm)/(tcp+tcm)
-								<< "\t" << tcp+tcm << "\t" << mcp+mcm << "\t" << strand << "\t" << next
-								<< "\t+\t" << tcp << "\t" << mcp << "\t-\t" << tcm << "\t" << mcm << endl;
-			} else {
-				//less than minDepthForComp
-			}
-
+			boost::thread *tprout = new boost::thread( appendToFile, boost::ref(mergedLaneFile), out, rout);
+			mergeio.add_thread(tprout);
+			//cout << "added output thread" << endl;
 		}
+		///////////////////////////////////////////
+		mergeio.join_all();
 	}
 	mergedLaneFile.close();
 }
