@@ -1757,31 +1757,22 @@ int CallBetaBinomialFit(vector <int> & tci, vector <int> & mci, BiKey & fits) {
 	string cmd = exep + "/bbf " + join_vec(tci) + " " + join_vec(mci);
 	//std::cerr << "/bbf " + join_vec(tci) + " " + join_vec(mci) << std::endl;
 
-	boost::asio::io_service ios;
-	boost::process::async_pipe ap(ios);
-	boost::process::child c(cmd, boost::process::std_out > ap);
+	FILE *in;
+	if(!(in = popen(cmd.c_str(), "r"))){
+		return 1;
+	}
 
-	boost::asio::streambuf buf;
-	boost::asio::async_read(ap, buf, [](const boost::system::error_code &ec, std::size_t size){});
-
-	ios.run();
-	c.wait();
-	ap.close();
-
-	istringstream iss(std::string((std::istreambuf_iterator<char>(&buf)), std::istreambuf_iterator<char>()));
-	std::string line;
-	boost::regex expression("^([0-9]+),([0-9]+)$");
-
-	while (std::getline(iss, line)) {
-		boost::smatch fields;
-		if (boost::regex_match(line, fields, expression)) {
-			if(fields.size() == 3) { // fields[0] is the complete match string, fields[1]/fields[2] are 1st and 2nd group
-				fits.n1 = string_to_int(fields[1]);
-				fits.k1 = string_to_int(fields[2]);
-				break;
-			}
+	char buff[512];
+	while(fgets(buff, sizeof(buff), in)!=NULL){
+		std::vector<string> fields;
+		boost::split(fields, buff, boost::is_any_of(","));
+		if (fields.size()==2) {
+			fits.n1 = string_to_int(fields[0]);
+			fits.k1 = string_to_int(fields[1]);
+			// break; // keep the last update
 		}
 	}
+	pclose(in);
 
 	return 0;
 }
