@@ -50,6 +50,7 @@
 //#include <boost/date_time.hpp>
 #include <boost/process.hpp>
 #include <boost/regex.hpp>
+#include <boost/asio/io_service.hpp>
 #include <future>
 #include <sstream>
 
@@ -1757,17 +1758,19 @@ int CallBetaBinomialFit(vector <int> & tci, vector <int> & mci, BiKey & fits) {
 	//std::cerr << "/bbf " + join_vec(tci) + " " + join_vec(mci) << std::endl;
 
 	boost::asio::io_service ios;
-	std::future<std::string> data;
-	boost::process::child c(cmd
-			, boost::process::std_in.close()
-			, boost::process::std_out > data
-			, boost::process::std_err > boost::process::null
-			, ios);
-	ios.run();
+	boost::process::async_pipe ap(ios);
+	boost::process::child c(cmd, boost::process::std_out > ap);
 
-	boost::regex expression("^([0-9]+),([0-9]+)$");
-	istringstream iss(data.get());
+	boost::asio::streambuf buf;
+	boost::asio::async_read(ap, buf, [](const boost::system::error_code &ec, std::size_t size){});
+
+	ios.run();
+	c.wait();
+	ap.close();
+
+	istringstream iss(std::string((std::istreambuf_iterator<char>(&buf)), std::istreambuf_iterator<char>()));
 	std::string line;
+	boost::regex expression("^([0-9]+),([0-9]+)$");
 
 	while (std::getline(iss, line)) {
 		boost::smatch fields;
@@ -1779,6 +1782,7 @@ int CallBetaBinomialFit(vector <int> & tci, vector <int> & mci, BiKey & fits) {
 			}
 		}
 	}
+
 	return 0;
 }
 
