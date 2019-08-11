@@ -1737,6 +1737,38 @@ void strandSpecificMethForLane( string inputFile )
 	//getStats(inFile);
 }
 
+string join_vec(vector<int> & vec){
+	std::ostringstream oss;
+	if (!vec.empty()){
+		std::copy(vec.begin(), vec.end()-1, std::ostream_iterator<int>(oss, " "));
+		oss << vec.back();
+	}
+	return oss.str();
+}
+
+//CallBetaBinomialFit(tci, mci, fits); //fits = <int> n1, <int> k1
+int CallBetaBinomialFit(vector <int> & tci, vector <int> & mci, BiKey & fits) {
+	FILE *in;
+	char buff[512];
+
+	string exep = get_exepath();
+	string cmd = exep + "/bbf " + join_vec(tci) + " " + join_vec(mci);
+	//std::cerr << "/bbf " + join_vec(tci) + " " + join_vec(mci) << std::endl;
+	if(!(in = popen(cmd.c_str(), "r"))){
+		return 1;
+	}
+
+	while(fgets(buff, sizeof(buff), in)!=NULL){
+		vector <string> fields;
+		boost::split(fields, buff, boost::is_any_of(","));
+		fits.n1 = string_to_int(fields[0]);
+		fits.k1 = string_to_int(fields[1]);
+		break;
+	}
+	pclose(in);
+
+	return 0;
+}
 
 void mergeRatioFilesWorker(	map<int, map <string, map<int, cMeth> > >  & lanesPlus, map<int, map <string, map<int, cMeth> > >  & lanesMinus, string chr, set <int> & starts, int pstart, int batchSize, vector<string> & out, Opts & option)
 {
@@ -1841,7 +1873,8 @@ void mergeRatioFilesWorker(	map<int, map <string, map<int, cMeth> > >  & lanesPl
 				BiKey fits(-1, -1);
 
 				if(tci.size() >1 ){
-					BetaBinomialFit(tci, mci, fits); //fits = <int> n1, <int> k1
+					// BetaBinomialFit(tci, mci, fits); //fits = <int> n1, <int> k1
+					CallBetaBinomialFit(tci, mci, fits); // Calling external bbf, this can be paralleled
 				} else {
 					fits.n1 = tci[0];
 					fits.k1 = mci[0];
