@@ -1847,10 +1847,21 @@ void mergeRatioFilesWorker(	map<int, map <string, map<int, cMeth> > >  & lanesPl
 					fits.k1 = mci[0];
 				}
 
+				if (fits.n1 > 0) {
+					mergedLaneFile 	<< setprecision(3) << chr << "\t" << start << "\t" << end << "\t" << double(fits.k1)/(fits.n1)
+						<< "\t" << fits.n1 << "\t" << fits.k1 << "\t" << strand << "\t" << next
+						<< "\t+\t" << tcp << "\t" << mcp << "\t-\t" << tcm << "\t" << mcm;
+				}
 
-				mergedLaneFile 	<< setprecision(3) << chr << "\t" << start << "\t" << end << "\t" << double(fits.k1)/(fits.n1)
-								<< "\t" << fits.n1 << "\t" << fits.k1 << "\t" << strand << "\t" << next
-								<< "\t+\t" << tcp << "\t" << mcp << "\t-\t" << tcm << "\t" << mcm;
+				//  else {
+				//  	// non-zero inputs, predict zero totalC, simply average. by Jin Li @ 20190809
+				//  	// Or just ignore?
+
+				//  	mergedLaneFile 	<< setprecision(3) << chr << "\t" << start << "\t" << end << "\t" << double(mcp+mcm)/(tcp+tcm)
+				//  		<< "\t" << fits.n1 << "\t" << fits.k1 << "\t" << strand << "\t" << next
+				//  		<< "\t+\t" << tcp << "\t" << mcp << "\t-\t" << tcm << "\t" << mcm;
+				//  }
+
 			} else if(tc >= option.minDepthForComp) {
 				mergedLaneFile 	<< setprecision(3) << chr << "\t" << start << "\t" << end << "\t" << double(mcp+mcm)/(tcp+tcm)
 								<< "\t" << tcp+tcm << "\t" << mcp+mcm << "\t" << strand << "\t" << next
