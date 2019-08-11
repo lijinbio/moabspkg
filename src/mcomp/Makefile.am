@@ -1,14 +1,14 @@
 bin_PROGRAMS = mcomp bbf
 
 mcomp_CPPFLAGS = -Wall -w -Ilib -Ilib/eigen_3.2.4 -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -Wno-unused-function -Wno-invalid-partial-specialization
-CXXFLAGS = -O3 -pipe
+CXXFLAGS = -O3 -pipe -std=c++11 
 
 if OS_LINUX
-mcomp_LDADD = -lboost_program_options -lboost_system -lboost_filesystem -lboost_thread -lrt -lpthread
+mcomp_LDADD = -lboost_program_options -lboost_system -lboost_filesystem -lboost_thread -lboost_regex -lrt -lpthread
 endif
 
 if OS_DARWIN
-mcomp_LDADD = -lboost_program_options -lboost_system -lboost_filesystem -lboost_thread -lpthread
+mcomp_LDADD = -lboost_program_options -lboost_system -lboost_filesystem -lboost_thread -lboost_regex -lpthread
 endif
 
 mcomp_SOURCES = \
@@ -26,7 +26,6 @@ mcomp_SOURCES = \
 	mcomp.cpp
 
 bbf_CPPFLAGS = -Wall -w -Ilib -Ilib/eigen_3.2.4 -DBOOST_RESULT_OF_USE_TR1 -DBOOST_NO_DECLTYPE -DBOOST_DISABLE_ASSERTS -Wno-unused-function -Wno-invalid-partial-specialization
-CXXFLAGS = -O3 -pipe
 if OS_LINUX
 bbf_LDADD = -lboost_program_options -lboost_system -lboost_filesystem -lboost_thread -lrt -lpthread
 endif
