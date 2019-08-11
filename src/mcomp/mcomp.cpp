@@ -50,7 +50,8 @@
 //#include <boost/date_time.hpp>
 #include <boost/process.hpp>
 #include <boost/regex.hpp>
-
+#include <future>
+#include <sstream>
 
 #include <math.h> //round() function
 
@@ -1755,14 +1756,20 @@ int CallBetaBinomialFit(vector <int> & tci, vector <int> & mci, BiKey & fits) {
 	string cmd = exep + "/bbf " + join_vec(tci) + " " + join_vec(mci);
 	//std::cerr << "/bbf " + join_vec(tci) + " " + join_vec(mci) << std::endl;
 
-	boost::process::ipstream pipe_stream;
-	boost::process::child c(cmd, boost::process::std_out > pipe_stream);
-	c.wait();
+	boost::asio::io_service ios;
+	std::future<std::string> data;
+	boost::process::child c(cmd
+			, boost::process::std_in.close()
+			, boost::process::std_out > data
+			, boost::process::std_err > boost::process::null
+			, ios);
+	ios.run();
 
-	std::string line;
 	boost::regex expression("^([0-9]+),([0-9]+)$");
+	istringstream iss(data.get());
+	std::string line;
 
-	while (std::getline(pipe_stream, line)) {
+	while (std::getline(iss, line)) {
 		boost::smatch fields;
 		if (boost::regex_match(line, fields, expression)) {
 			if(fields.size() == 3) { // fields[0] is the complete match string, fields[1]/fields[2] are 1st and 2nd group
