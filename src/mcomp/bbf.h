@@ -1,4 +1,6 @@
 #include <vector>
+#include <string>
+#include <iostream>
 
 #include "types.h"
 
