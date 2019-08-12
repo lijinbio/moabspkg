@@ -8,6 +8,8 @@
 #include <stan/model/model_header.hpp>
 #include <stan/services/command.hpp>
 
+#include "bbf.h"
+
 std::vector <double> muall;
 std::vector <double> ssall;
 
@@ -436,25 +438,26 @@ public:
 typedef betabinFit_model_namespace::betabinFit_model stan_model;
 
 
-class BiKey {
-  public:
-    int  n1;
-    int  k1;
-
-    BiKey(long N1, int K1)
-      : n1(N1), k1(K1) {}
-
-    bool operator<(const BiKey &right) const
-    {
-        if ( n1 == right.n1 ) {
-        	return k1 < right.k1;
-        }
-        else {
-            return n1 < right.n1;
-        }
-    }
-};
-
+// // It has been defined in `types.h`, so remove it from here
+// class BiKey {
+//   public:
+//     int  n1;
+//     int  k1;
+// 
+//     BiKey(long N1, int K1)
+//       : n1(N1), k1(K1) {}
+// 
+//     bool operator<(const BiKey &right) const
+//     {
+//         if ( n1 == right.n1 ) {
+//         	return k1 < right.k1;
+//         }
+//         else {
+//             return n1 < right.n1;
+//         }
+//     }
+// };
+// 
 
 
 int beta_binomial_fit_wrapper(int ac, const char* av[], std::istringstream & ifs, BiKey & bk) {
@@ -492,6 +495,11 @@ int beta_binomial_fit_wrapper(int ac, const char* av[], std::istringstream & ifs
 
     bk.n1 = n;
     bk.k1 = k;
+
+		// Bug fix By Jin Li @ 20190809
+		// Clear these global vectors, otherwise, they will grow continously
+		muall.clear();
+		ssall.clear();
 
     return 0;
   } catch (const std::exception& e) {
