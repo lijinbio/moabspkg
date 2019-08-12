@@ -48,11 +48,13 @@
 #include <boost/thread.hpp>
 #include <boost/program_options.hpp>
 //#include <boost/date_time.hpp>
-#include <boost/process.hpp>
-#include <boost/regex.hpp>
-#include <boost/asio/io_service.hpp>
-#include <future>
-#include <sstream>
+
+// For boost::process, not working in CentOS due to no automatic pipe closing
+// #include <boost/process.hpp>
+// #include <boost/regex.hpp>
+// #include <boost/asio/io_service.hpp>
+// #include <future>
+// #include <sstream>
 
 #include <math.h> //round() function
 
