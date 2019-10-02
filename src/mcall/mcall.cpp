@@ -33,7 +33,7 @@
 //#include <boost/date_time.hpp>
 
 //depth for saturation on statistics
-#define DEPTHSAT 20
+#define DEPTHSAT 40
 
 namespace po = boost::program_options;
 
