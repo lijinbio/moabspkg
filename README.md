@@ -1,6 +1,21 @@
 # MOABS: MOdel based Analysis of Bisulfite Sequencing data
 A comprehensive, accurate and efficient solution for analysis of large scale base-resolution DNA methylation data, bisulfite sequencing or single molecule direct sequencing.
 
+## MOABS at Bioconda
+
+MOABS has been deployed in https://anaconda.org/bioconda/moabs. To install MOABS from Bioconda, the following channels should be added. Namely,
+
+```
+conda config --add channels defaults
+conda config --add channels bioconda
+conda config --add channels conda-forge
+conda install moabs
+```
+
+## MOABS at UseGalaxy.eu
+
+MOABS has been depolyed in https://usegalaxy.eu/root?tool_id=moabs for public usage.
+
 ##Abstract
 MOABS seamlessly integrates alignment, methylation calling, identification of hypomethylation for one sample and differential methylation for multiple samples, and other downstream analysis.
 
