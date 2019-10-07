@@ -9,6 +9,7 @@
 //TODO: statistics when merging ratio files
 #define ALPHA 0.05
 #define BATCHMAX 2000
+#define BUFFSIZE 2048000                          // 2000 batch size, each with 1024 bytes for current replicates
 //#include <RInside.h>                            // for the embedded R via RInside
 #include <vector>
 #include <string>
@@ -57,6 +58,13 @@
 // #include <sstream>
 
 #include <math.h> //round() function
+
+// For two-way pipe
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
+#include <unistd.h>
+#include <sys/wait.h>
 
 namespace po = boost::program_options;
 using namespace std;
@@ -1753,29 +1761,86 @@ string join_vec(vector<int> & vec){
 	return oss.str();
 }
 
-//CallBetaBinomialFit(tci, mci, fits); //fits = <int> n1, <int> k1
-int CallBetaBinomialFit(vector <int> & tci, vector <int> & mci, BiKey & fits) {
-	string exep = get_exepath();
-	string cmd = exep + "/bbf " + join_vec(tci) + " " + join_vec(mci);
-	//std::cerr << "/bbf " + join_vec(tci) + " " + join_vec(mci) << std::endl;
-
-	FILE *in;
-	if(!(in = popen(cmd.c_str(), "r"))){
+int CallBetaBinomialFit(map< int, vector< vector <int> > > & tcmcs, map< int, BiKey > & fits) {
+	string input;
+	for (map< int, vector< vector <int> > > :: iterator it=tcmcs.begin(); it!=tcmcs.end(); ++it) {
+		input += to_string(it->first) + " " + join_vec(it->second[0]) + " " + join_vec(it->second[1]) + "\n";
+	}
+	std::cout << '.';
+	int fd1[2];
+	int fd2[2];
+	pid_t cid;
+	if(-1==pipe(fd1)) {
+		fprintf(stderr, "Pipe failed");
+		return 1;
+	}
+	if(-1==pipe(fd2)) {
+		fprintf(stderr, "Pipe failed");
 		return 1;
 	}
 
-	char buff[512];
-	while(fgets(buff, sizeof(buff), in)!=NULL){
-		std::vector<string> fields;
-		boost::split(fields, buff, boost::is_any_of(","));
-		if (fields.size()==2) {
-			fits.n1 = string_to_int(fields[0]);
-			fits.k1 = string_to_int(fields[1]);
-			// break; // keep the last update
+	cid=fork();
+	if (cid==-1) {
+		fprintf(stderr, "Fork error");
+		return 1;
+	} else if (cid==0) {
+		char buff[BUFFSIZE]={'\0'};
+		string result;
+
+		close(fd1[1]);
+		read(fd1[0], buff, BUFFSIZE);
+		close(fd1[0]);
+
+		std::vector<string> lines;
+		boost::split(lines, buff, boost::is_any_of("\n"));
+		for (int lno=0; lno<lines.size(); lno++) {
+			if (lines[lno].empty()) continue;
+			std::vector<string> fields;
+			boost::split(fields, lines[lno], boost::is_any_of(" "));
+			std::vector<int> n;
+			std::vector<int> k;
+			int nums=fields.size();
+			for(int i=1; i<nums; i++){
+				if(i<=nums/2){
+					n.push_back(string_to_int(fields[i]));
+				} else {
+					k.push_back(string_to_int(fields[i]));
+				}
+			}
+
+			BiKey bk(-1,-1);
+			BetaBinomialFit(n, k, bk);
+			result += fields[0] + " " + to_string(bk.n1) + " " + to_string(bk.k1) + "\n";
+		}
+
+		close(fd2[0]);
+		write(fd2[1], result.c_str(), result.size()+1);
+		close(fd2[1]);
+		exit(0);
+	} else {
+		char buff[BUFFSIZE]={'\0'};
+
+		close(fd1[0]);
+		write(fd1[1], input.c_str(), input.size()+1);
+		close(fd1[1]);
+		wait(NULL);
+		close(fd2[1]);
+		read(fd2[0], buff, BUFFSIZE);
+		close(fd2[0]);
+
+		std::vector<string> lines;
+		boost::split(lines, buff, boost::is_any_of("\n"));
+		for (int lno=0; lno<lines.size(); lno++) {
+			if (lines[lno].empty()) continue;
+			std::vector<string> fields;
+			boost::split(fields, lines[lno], boost::is_any_of(" "));
+			if (fields.size()==3) {
+				int start=string_to_int(fields[0]);
+				fits[start].n1=string_to_int(fields[1]);
+				fits[start].k1=string_to_int(fields[2]);
+			}
 		}
 	}
-	pclose(in);
-
 	return 0;
 }
 
@@ -1785,8 +1850,10 @@ void mergeRatioFilesWorker(	map<int, map <string, map<int, cMeth> > >  & lanesPl
 		set <int>::iterator it = starts.begin();
 		for(int j = 0; j <  pstart; j++) it++; //now it points to starts.begin() + pstart// do not understand why "it=starts.begin() + pstart" does not compile.
 
+		map<int, MergeLaneElement> mergedstarts; // start -> merged lane elements
+		map<int, vector< vector< int > > > tcmcs; // start -> <tcs, mcs>
+
 		for(int k = 0; k < batchSize; k++){
-			stringstream mergedLaneFile;
 			int start = *it;
 			
 		//Todo:It's redundant to do summations for both options. Please detach into two "for" statements.
@@ -1874,49 +1941,68 @@ void mergeRatioFilesWorker(	map<int, map <string, map<int, cMeth> > >  & lanesPl
 			//for debug purpose
 			//std::cerr << chr << "\t" << start << "\t" << end << endl;
 			//int option_wi_variance = 1;
+
 			if(option.withVariance && tc >= option.minDepthForComp){
+				MergeLaneElement element;
+				element.start=start;
+				element.end=end;
+				element.tcp=tcp;
+				element.mcp=mcp;
+				element.tcm=tcm;
+				element.mcm=mcm;
+				element.strand=strand;
+				element.next=next;
+				element.chr=chr;
 
-				//std::cout << "Fitting with BetaBinomial Model" << std::endl;
-
-				//cout << "Start Fitting" << endl;
-				BiKey fits(-1, -1);
-
-				if(tci.size() >1 ){
-					// BetaBinomialFit(tci, mci, fits); //fits = <int> n1, <int> k1
-					CallBetaBinomialFit(tci, mci, fits); // Calling external bbf, this can be paralleled
+				if(tci.size()>1){
+					tcmcs[start].push_back(tci);
+					tcmcs[start].push_back(mci);
 				} else {
-					fits.n1 = tci[0];
-					fits.k1 = mci[0];
+					element.k=mci[0];
+					element.n=tci[0];
 				}
 
-				if (fits.n1 > 0) {
-					mergedLaneFile 	<< setprecision(3) << chr << "\t" << start << "\t" << end << "\t" << double(fits.k1)/(fits.n1)
-						<< "\t" << fits.n1 << "\t" << fits.k1 << "\t" << strand << "\t" << next
-						<< "\t+\t" << tcp << "\t" << mcp << "\t-\t" << tcm << "\t" << mcm;
-				}
-
-				//  else {
-				//  	// non-zero inputs, predict zero totalC, simply average. by Jin Li @ 20190809
-				//  	// Or just ignore?
-
-				//  	mergedLaneFile 	<< setprecision(3) << chr << "\t" << start << "\t" << end << "\t" << double(mcp+mcm)/(tcp+tcm)
-				//  		<< "\t" << fits.n1 << "\t" << fits.k1 << "\t" << strand << "\t" << next
-				//  		<< "\t+\t" << tcp << "\t" << mcp << "\t-\t" << tcm << "\t" << mcm;
-				//  }
-
+				mergedstarts[start] = element;
 			} else if(tc >= option.minDepthForComp) {
-				mergedLaneFile 	<< setprecision(3) << chr << "\t" << start << "\t" << end << "\t" << double(mcp+mcm)/(tcp+tcm)
-								<< "\t" << tcp+tcm << "\t" << mcp+mcm << "\t" << strand << "\t" << next
-								<< "\t+\t" << tcp << "\t" << mcp << "\t-\t" << tcm << "\t" << mcm;
+				MergeLaneElement element;
+				element.start=start;
+				element.end=end;
+				element.k=mcp+mcm;
+				element.n=tcp+tcm;
+				element.tcp=tcp;
+				element.mcp=mcp;
+				element.tcm=tcm;
+				element.mcm=mcm;
+				element.strand=strand;
+				element.next=next;
+				element.chr=chr;
+
+				mergedstarts[start] = element;
 			} else {
 				//less than minDepthForComp
 			}
-			
-			string moreThanDepthStr = mergedLaneFile.str();
-			if(!   moreThanDepthStr.empty() ) out.push_back(moreThanDepthStr);
 			it++;
 		}
 
+		map<int, BiKey > fits; // start -> BiKey
+		CallBetaBinomialFit(tcmcs, fits); // Calling Beta-binomial fitting sequentially
+
+		for(map<int, BiKey>::iterator it=fits.begin(); it!=fits.end(); ++it) {
+			mergedstarts[it->first].k=it->second.k1;
+			mergedstarts[it->first].n=it->second.n1;
+		}
+
+		for (map<int, MergeLaneElement> :: iterator it=mergedstarts.begin(); it!=mergedstarts.end(); ++it) {
+			MergeLaneElement e=it->second;
+			if (e.n>0) {
+				stringstream mergedLaneFile;
+				mergedLaneFile << setprecision(3) << e.chr << "\t" << e.start << "\t" << e.end << "\t" << double(e.k)/(e.n)
+					<< "\t" << e.n << "\t" << e.k << "\t" << e.strand << "\t" << e.next
+					<< "\t+\t" << e.tcp << "\t" << e.mcp << "\t-\t" << e.tcm << "\t" << e.mcm;
+				string moreThanDepthStr = mergedLaneFile.str();
+				if(!   moreThanDepthStr.empty() ) out.push_back(moreThanDepthStr);
+			}
+		}
 }
 
 void mergeRatioFiles(vector<string> & filesToMerge, string outFileName, Opts & option)

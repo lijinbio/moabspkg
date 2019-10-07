@@ -51,6 +51,9 @@ class BiKey {
     int  n1;
     int  k1;
 
+    BiKey()
+      : n1(-1), k1(-1) {}
+
     BiKey(int N1, int K1)
       : n1(N1), k1(K1) {}
 
@@ -63,6 +66,21 @@ class BiKey {
             return n1 < right.n1;
         }
     }
+};
+
+struct MergeLaneElement {
+	int start;
+	int end;
+	int k;
+	int n;
+	int tcp;
+	int mcp;
+	int tcm;
+	int mcm;
+	char strand;
+	char next;
+	std::string chr;
+	MergeLaneElement(): start(-1), end(-1), k(-1), n(-1), tcp(-1), mcp(-1), tcm(-1), mcm(-1), strand('x'), next('X') { }
 };
 
 
