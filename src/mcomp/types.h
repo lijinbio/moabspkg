@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #define TOLER 1e-10
 #define TENEPS 1e-16
 //you may change this to 1e-18 by change double to long double for toler in Adapt.h
@@ -139,3 +141,4 @@ std::string itos(int i);
 int string_to_int( std::string s);
 std::string get_exepath();
 std::string do_readlink(std::string const& path);
+bool isconsensus(std::vector< int > & tcs, std::vector< int > & mcs, int depth=10); // depth>=10, max-min<0.1

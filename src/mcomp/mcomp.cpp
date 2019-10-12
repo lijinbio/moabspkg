@@ -1955,8 +1955,13 @@ void mergeRatioFilesWorker(	map<int, map <string, map<int, cMeth> > >  & lanesPl
 				element.chr=chr;
 
 				if(tci.size()>1){
-					tcmcs[start].push_back(tci);
-					tcmcs[start].push_back(mci);
+					if (isconsensus(tci, mci)) { // consistent replicates, no need to fit BBF
+						element.k=mcp+mcm;
+						element.n=tcp+tcm;
+					} else {
+						tcmcs[start].push_back(tci);
+						tcmcs[start].push_back(mci);
+					}
 				} else {
 					element.k=mci[0];
 					element.n=tci[0];
