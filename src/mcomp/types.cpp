@@ -12,6 +12,7 @@
 #include <iterator>
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 
 #include <iostream>
 #include <iomanip>
@@ -78,4 +79,16 @@ std::string get_exepath(){
 	    //if your current working dir is /pathA and mcomp is /pathB/mcomp, it returns "/pathA/mcomp" then "/pathA"
 	
 		return exep;
+}
+
+bool isconsensus(std::vector< int > & tcs, std::vector< int > & mcs, int depth=10) {
+	double maxratio=0.0;
+	double minratio=1.0;
+	for (int locus=0; locus<tcs.size(); locus++) {
+		if (tcs[locus]<depth) return false;
+		double locusratio = mcs[locus]/tcs[locus];
+		maxratio=std::max(maxratio, locusratio);
+		minratio=std::min(minratio, locusratio);
+	}
+	return maxratio<minratio+0.1;
 }
