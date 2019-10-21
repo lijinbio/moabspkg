@@ -1437,6 +1437,55 @@ void getDmr(string chr, vector<int> & allLocs, map<int, PairCompOut> & thisChr, 
 
 };
 
+// copied from void readLaneToStrandSpecificHash( string file, map <string, map<int, cMeth> > & methPs, map <string, map<int, cMeth> > & methMs)
+void readLaneToStrandSpecificHash( string file, map <string, map<int, cMeth> > & methPs, map <string, map<int, cMeth> > & methMs, string chr )
+{
+	int colIdForChr = 0;
+	int colIdForTotalCPs = 9;
+	int colIdForMethCPs = 10;
+	int colIdForTotalCMs = 12;
+	int colIdForMethCMs = 13;
+	int colIdForStart = 1;
+	//int colIdForStrand = -1;
+	int colIdForNext = 7;
+
+	string chrom;
+	int start;
+	int totalCPs;
+	int methCPs;
+	int totalCMs;
+	int methCMs;
+	char strand;
+	char next;
+
+	int count = 0;
+	string line = "";
+	ifstream inputf(file.c_str(), ios::in);
+	while (inputf.good()) {
+		getline(inputf, line);
+		if(line == ""){continue;}
+
+		vector <string> fields;
+		boost::split(fields, line, boost::is_any_of("\t"));
+		if( count == 0 )		//header line
+		{
+		} else {				//content
+			chrom = fields[colIdForChr];
+			if (chrom != chr) continue;
+			start = string_to_int(fields[colIdForStart]);
+			totalCPs = string_to_int(fields[colIdForTotalCPs]);
+			methCPs = string_to_int(fields[colIdForMethCPs]);
+			totalCMs = string_to_int(fields[colIdForTotalCMs]);
+			methCMs = string_to_int(fields[colIdForMethCMs]);
+			//strand = fields[colIdForStrand][0];
+			next = fields[colIdForNext][0];
+			if(totalCPs > 0){ methPs[chrom][start] = cMeth(totalCPs, methCPs, '+', next);}
+			if(totalCMs > 0){ methMs[chrom][start] = cMeth(totalCMs, methCMs, '-', next);}
+		}
+		count += 1 ;
+	}
+	inputf.close();
+}
 
 void readLaneToStrandSpecificHash( string file, map <string, map<int, cMeth> > & methPs, map <string, map<int, cMeth> > & methMs ) //read file back to hash //for around 6,000,000 records, this consumes 500M ram and takes 40 seconds.
 {
@@ -1761,6 +1810,15 @@ string join_vec(vector<int> & vec){
 	return oss.str();
 }
 
+string join_vec(vector<string> & vec){
+	std::ostringstream oss;
+	if (!vec.empty()){
+		std::copy(vec.begin(), vec.end()-1, std::ostream_iterator<string>(oss, " "));
+		oss << vec.back();
+	}
+	return oss.str();
+}
+
 int CallBetaBinomialFit(map< int, vector< vector <int> > > & tcmcs, map< int, BiKey > & fits) {
 	string input;
 	for (map< int, vector< vector <int> > > :: iterator it=tcmcs.begin(); it!=tcmcs.end(); ++it) {
@@ -2010,10 +2068,138 @@ void mergeRatioFilesWorker(	map<int, map <string, map<int, cMeth> > >  & lanesPl
 		}
 }
 
+// From readLaneToStrandSpecificHash
+void getChroms(vector<string> & filesToMerge, set<string> & chroms) {
+	for(unsigned int i=0; i<filesToMerge.size(); i++) {
+		int count = 0;
+		string line = "";
+		ifstream inputf(filesToMerge[i].c_str(), ios::in);
+		while (inputf.good()) {
+			getline(inputf, line);
+			if(line == ""){continue;}
+
+			vector <string> fields;
+			boost::split(fields, line, boost::is_any_of("\t"));
+			if( count == 0 ) { //header line
+			} else {				//content
+				chroms.insert(fields[0]);
+			}
+			count += 1;
+		}
+		inputf.close();
+	}
+}
+
+// copied from void mergeRatioFiles(vector<string> & filesToMerge, string outFileName, Opts & option)
+void mergeRatioFiles(vector<string> & filesToMerge, string outFileName, Opts & option, string & chr)
+{
+	map<int, map <string, map<int, cMeth> > > lanesPlus ; //laneId->chrom->loc->(totalC, methC, strand, nextN); for + strand;
+	map<int, map <string, map<int, cMeth> > > lanesMinus ; //laneId->chrom->loc->(totalC, methC, strand, nextN); for - strand;
+
+	for(unsigned int i = 0; i < filesToMerge.size(); i++ ){
+		cout << " start reading file " << filesToMerge[i] << " " << chr << endl;
+		map <string, map<int, cMeth> > methPs;
+		map <string, map<int, cMeth> > methMs;
+		readLaneToStrandSpecificHash( filesToMerge[i], methPs, methMs, chr );
+		lanesPlus[i] = methPs;
+		lanesMinus[i] = methMs;
+	}
+	cout << " finish reading" << endl;
+	
+	ofstream mergedLaneFile;
+	mergedLaneFile.open(outFileName.c_str(), ios_base::out);
+
+	//get all locations for current chrom
+	set <int> starts;
+	for(unsigned int i = 0; i < lanesPlus.size(); i++ ){
+		for(map<int, cMeth>::iterator it = lanesPlus[i][chr].begin(); it != lanesPlus[i][chr].end(); ++it) {
+			starts.insert(it->first);
+		}
+	}
+	for(unsigned int i = 0; i < lanesMinus.size(); i++ ){
+		for(map<int, cMeth>::iterator it = lanesMinus[i][chr].begin(); it != lanesMinus[i][chr].end(); ++it) {
+			starts.insert(it->first);
+		}
+	}
+
+	bool endOfChr = false;
+	int pstart = 0;
+	int batchSize = BATCHMAX;
+	boost::thread_group mergeio;
+	//this way of threading makes sure the output is still sorted
+	while( ! endOfChr )
+	{
+		boost::thread_group g;
+		vector < vector<string> > out;
+		out.resize(option.threads);
+		int thisStart = pstart;
+
+		int i = 0;
+		for( ; i < option.threads;  )
+		{
+			if(starts.size() - pstart < BATCHMAX)
+			{
+				batchSize = starts.size() - pstart;
+				boost::thread *tp = new boost::thread( mergeRatioFilesWorker, boost::ref(lanesPlus), boost::ref(lanesMinus),chr, boost::ref(starts), pstart, batchSize, boost::ref(out[i]), option );
+				g.add_thread(tp);
+				pstart = pstart + batchSize;
+				i++;
+				endOfChr = true;
+				break;//no more location in current chrom. breaks out of inner most for loop
+			} else
+			{
+				boost::thread *tp = new boost::thread( mergeRatioFilesWorker, boost::ref(lanesPlus), boost::ref(lanesMinus),chr, boost::ref(starts), pstart, batchSize, boost::ref(out[i]), option );
+				g.add_thread(tp);
+				pstart = pstart + batchSize;
+				i++;
+			}
+		}
+
+		vector<string> rout;
+
+		g.join_all();
+
+		//put both nonR and R calculation to file in a backgroud thread
+		mergeio.join_all();
+		//cout << "joined output thread" << endl;
+
+		boost::thread *tprout = new boost::thread( appendToFile, boost::ref(mergedLaneFile), out, rout);
+		mergeio.add_thread(tprout);
+		//cout << "added output thread" << endl;
+	}
+	///////////////////////////////////////////
+	mergeio.join_all();
+	mergedLaneFile.close();
+}
+
+void mergeRatioFilesByChrom(vector<string> & filesToMerge, string outFileName, Opts & option)
+{
+	set<string> chroms;
+	getChroms(filesToMerge, chroms);
+	vector< string > outfiles;
+	for (set<string>::iterator pchr=chroms.begin(); pchr!=chroms.end(); pchr++)
+	{
+		string chr = *pchr;
+		string outfile=outFileName+"_"+chr+".bed";
+		mergeRatioFiles(filesToMerge, outfile, option, chr);
+		outfiles.push_back(outfile);
+	}
+
+	ofstream mergedLaneFile;
+	mergedLaneFile.open(outFileName.c_str(), ios_base::out);
+	mergedLaneFile << "#chrom\tstart\tend\tratio\ttotalC\tmethC\tstrand\tnext\tPlus\ttcP\tmcP\tMinus\ttcM\tmcM" << endl;
+	mergedLaneFile.close();
+
+	string sysCmd;
+	sysCmd = "cat " + join_vec(outfiles) + " >> " + outFileName;
+	system(sysCmd.c_str());
+	sysCmd = "rm -f " + join_vec(outfiles);
+	system(sysCmd.c_str());
+}
+
+
 void mergeRatioFiles(vector<string> & filesToMerge, string outFileName, Opts & option)
 {
-	
-
 	map<int, map <string, map<int, cMeth> > > lanesPlus ; //laneId->chrom->loc->(totalC, methC, strand, nextN); for + strand;
 	map<int, map <string, map<int, cMeth> > > lanesMinus ; //laneId->chrom->loc->(totalC, methC, strand, nextN); for - strand;
 
@@ -4045,7 +4231,8 @@ try{
 		for(unsigned int i = 0; i < GO.ratiosFiles.size(); i++ ){
 			vector <string> toMergeFiles;
 			boost::split(toMergeFiles, GO.ratiosFiles[i], boost::is_any_of(","));
-			mergeRatioFiles(toMergeFiles, GO.mergedRatiosFiles[i], GO);
+			// mergeRatioFiles(toMergeFiles, GO.mergedRatiosFiles[i], GO);
+			mergeRatioFilesByChrom(toMergeFiles, GO.mergedRatiosFiles[i], GO);
 			cout << " done merging of ratio files " << GO.ratiosFiles[i] << " into " << GO.mergedRatiosFiles[i] << endl;
 		}
 		cout << "Finished merging of ratio files for withVariance=" << GO.withVariance << endl;
