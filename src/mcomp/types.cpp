@@ -86,7 +86,7 @@ bool isconsensus(std::vector< int > & tcs, std::vector< int > & mcs, int depth=1
 	double minratio=1.0;
 	for (int locus=0; locus<tcs.size(); locus++) {
 		if (tcs[locus]<depth) return false;
-		double locusratio = mcs[locus]/tcs[locus];
+		double locusratio = 1.0*mcs[locus]/tcs[locus];
 		maxratio=std::max(maxratio, locusratio);
 		minratio=std::min(minratio, locusratio);
 	}
